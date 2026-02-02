@@ -26,7 +26,7 @@ const Login = () => {
   ];
 
 const handleLoginSubmit = (data) => {
-    console.log("Login Data Submitted:", data);
+    console.log("Login Data Submitted: ", data);
     
     if (data.email && data.password) {
       // UPDATED: Redirect to '/dashboard' instead of '/'
