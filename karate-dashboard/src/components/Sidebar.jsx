@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, HouseIcon, LogInIcon, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, HouseIcon, LogInIcon, LogOut,User } from 'lucide-react';
 // 1. Import useNavigate alongside Link and useLocation
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
@@ -10,16 +10,24 @@ const Sidebar = () => {
   const menuItems = [
     // 2. UPDATED: Dashboard path is now '/dashboard' (not '/')
     { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/dashboard' },
+    { icon: <User size={20} />, label: 'Admins', path: '/users' },
     { icon: <Users size={20} />, label: 'Students', path: '/students' },
     { icon: <HouseIcon size={20} />, label: 'Dojos', path: '/dojos' },
     { icon: <LogInIcon size={20} />, label: 'Instructors', path: '/instructors' },
+    
   ];
 
   // 3. Handle Logout Function
   const handleLogout = () => {
-    // Optional: Clear any auth tokens here (e.g., localStorage.removeItem('token'))
-    // Redirect to Login Page
-    navigate('/'); 
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    } catch (error) {
+      console.error("Logout failed", error);
+      navaigate('/login');
+      
+    }
   };
 
   return (

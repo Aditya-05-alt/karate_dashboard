@@ -6,6 +6,7 @@ import { StudentView } from './pages/Students_CRUD/Student_view';
 import { DojoView } from './pages/dojoCRUD/dojo_view';
 import { InstructorView } from './pages/instructors_CRUD/instructor_view';
 import Login from './pages/Login';
+import { UserView } from './pages/users/users_view';
 
 // Layout Component
 const DashboardLayout = () => {
@@ -14,7 +15,7 @@ const DashboardLayout = () => {
       <Sidebar />
       <div className="flex-1 flex flex-col ml-64 min-w-0 transition-all duration-300">
         <div className="flex-none shadow-sm z-10 bg-white">
-          <Navbar userName="IGKA-ADMIN" />
+          <Navbar/>
         </div>
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
           <Outlet />
@@ -39,6 +40,7 @@ function App() {
           <Route path="/students" element={<StudentView />} />
           <Route path="/dojos" element={<DojoView />} />
           <Route path="/instructors" element={<InstructorView />} />
+          <Route path="/users" element={<UserView />} />
         </Route>
 
       </Routes>

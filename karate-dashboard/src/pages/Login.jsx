@@ -2,6 +2,7 @@ import React from 'react';
 import { Mail, Lock, ShieldCheck } from 'lucide-react';
 import Forms from '../components/Form';
 import { useNavigate } from 'react-router-dom';
+import { loginUser } from '../api-service/api';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -25,13 +26,19 @@ const Login = () => {
     }
   ];
 
-const handleLoginSubmit = (data) => {
-    console.log("Login Data Submitted: ", data);
+const handleLoginSubmit = async (data) => {
+  try {
+    // 2. Call the API
+    await loginUser(data.email, data.password);
     
-    if (data.email && data.password) {
-      // UPDATED: Redirect to '/dashboard' instead of '/'
-      navigate('/dashboard'); 
-    }
+    // 3. On success, redirect
+    navigate('/dashboard');
+  
+  } catch (error) {
+    // 4. Handle Errors (e.g., Wrong password)
+    console.error("Login Failed:", error);
+    alert(error.message || "Invalid credentials");
+  }
 };
   
 
@@ -49,8 +56,8 @@ const handleLoginSubmit = (data) => {
             <div className="bg-white/10 p-4 rounded-full inline-flex mb-4 backdrop-blur-sm border border-white/10">
                 <ShieldCheck className="w-12 h-12 text-red-500" />
             </div>
-            <h1 className="text-4xl font-bold text-white tracking-tight">KMS Admin</h1>
-            <p className="text-gray-400 mt-2">Sign in to manage your Dojo</p>
+            <h1 className="text-4xl font-bold text-white tracking-tight">IGKA Admin</h1>
+            <p className="text-gray-400 mt-2">Sign in to manage</p>
         </div>
 
         {/* The Dynamic Form Component */}
