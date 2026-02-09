@@ -10,7 +10,7 @@ export const Usercolumns = [
   { 
     label: 'Name', 
     key: 'name', 
-    sortable: true,
+    sortable: false,
     render: (row) => (
       <div>
         <span className="font-bold text-gray-800 block">{row.name}</span>
