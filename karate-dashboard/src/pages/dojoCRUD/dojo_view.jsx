@@ -3,7 +3,8 @@ import { Building2, MapPin, Phone, Edit, Trash2, Users, ExternalLink, X, Calenda
 import { useNavigate } from 'react-router-dom';
 import Table from '../../components/Table';
 import SearchBar from '../../components/SearchBar';
-import { getDojos, deleteDojo } from '../../api-service/api';
+import FilterComponent from '../../components/FilterComponent'; // Import Filter
+import { getDojos, deleteDojo, getInstructors } from '../../api-service/api'; // Import getInstructors
 
 // --- STAT CARD COMPONENT ---
 export const StatCard = ({ icon, title, value, color }) => (
@@ -21,6 +22,7 @@ export const StatCard = ({ icon, title, value, color }) => (
 export function DojoView() {
   const [dojos, setDojos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedInstructor, setSelectedInstructor] = useState(''); // State for filter
   const [selectedDojo, setSelectedDojo] = useState(null);
   const navigate = useNavigate();
 
@@ -50,7 +52,6 @@ export function DojoView() {
     const active = dojos.filter(d => d.status === 'Active').length;
     const inactive = total - active;
     
-    // Count unique addresses (normalize strings to avoid duplicates like " Tokyo " vs "Tokyo")
     const uniqueLocs = new Set(
       dojos
         .map(d => d.address?.trim())
@@ -60,10 +61,20 @@ export function DojoView() {
     return { total, active, inactive, uniqueLocs };
   }, [dojos]);
 
-  const filteredDojos = dojos.filter(d => 
-    d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    d.instructor.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- FILTERING LOGIC ---
+  const filteredDojos = useMemo(() => {
+    return dojos.filter(d => {
+      // 1. Search Filter (Name or Instructor Name)
+      const matchesSearch = 
+        d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        d.instructor.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // 2. Dropdown Filter (Instructor Name)
+      const matchesInstructor = selectedInstructor ? d.instructor === selectedInstructor : true;
+
+      return matchesSearch && matchesInstructor;
+    });
+  }, [dojos, searchTerm, selectedInstructor]);
 
   const columns = useMemo(() => [
     { 
@@ -146,15 +157,25 @@ export function DojoView() {
         </div>
         
         {/* Search & Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-end sm:items-center">
             <SearchBar onSearch={setSearchTerm} />
-            <button onClick={() => navigate('/dojos/create')} className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 shadow-sm font-medium flex items-center justify-center gap-2">
+
+            {/* --- NEW: Instructor Filter --- */}
+            <FilterComponent 
+                label="Instructor" 
+                api={getInstructors} 
+                displayKey="name"
+                valueKey="name"
+                onFilterChange={setSelectedInstructor} 
+            />
+            
+            <button onClick={() => navigate('/dojos/create')} className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 shadow-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap">
                 <span>+ Add Dojo</span>
             </button>
         </div>
       </div>
 
-      {/* 2. Stats Section (Placed Below Search Bar) */}
+      {/* 2. Stats Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
           title="Total Dojos" 

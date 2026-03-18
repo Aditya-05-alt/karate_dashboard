@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import { UserView } from './pages/users_CRUD/users_view';
 import { AddDojo } from './pages/dojoCRUD/dojo_add';
 import { AddInstructor } from './pages/instructors_CRUD/add_instructor';
+import { AddStudent } from './pages/Students_CRUD/Student_Add';
 
 // Layout Component
 const DashboardLayout = () => {
@@ -56,6 +57,8 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           
           <Route path="/students" element={<StudentView />} />
+          <Route path="/students/create" element={<AddStudent />} />
+          <Route path="/students/edit/:id" element={<AddStudent />} />
           
           {/* Dojo Routes */}
           <Route path="/dojos" element={<DojoView />} />

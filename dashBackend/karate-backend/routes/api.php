@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use \App\Http\Controllers\Api\DojoController;
 use App\Http\Controllers\Api\InstructorController;
+use App\Http\Controllers\Api\StudentController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -29,4 +30,6 @@ Route::middleware('auth:sanctum')->group(function () {
    
     // Instructors
     Route::apiResource('instructors', InstructorController::class);
+
+    Route::apiResource('students', StudentController::class);
 });

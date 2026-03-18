@@ -1,31 +1,84 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Building2, User, Phone, MapPin, Link as LinkIcon, Image as ImageIcon, ArrowLeft, Users, Activity } from 'lucide-react';
-import Forms from '../../components/Form';
-import { createDojo, getDojo, updateDojo } from '../../api-service/api';
+import { 
+  Building2, User, Phone, MapPin, Link as LinkIcon, Image as ImageIcon, 
+  ArrowLeft, Users, Activity, Upload, FileSpreadsheet, CheckCircle, Loader2 
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
+// Added getInstructors to imports
+import { createDojo, getDojo, updateDojo, getInstructors } from '../../api-service/api';
 
 export function AddDojo() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = !!id;
-  const [initialData, setInitialData] = useState(null);
+  
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState('single'); // 'single' or 'bulk'
+  
+  // State for Instructor Dropdown
+  const [instructorOptions, setInstructorOptions] = useState([]);
 
+  // Single Form State
+  const [formData, setFormData] = useState({
+    name: '',
+    instructor: '', // This will now store the Instructor Name (or ID depending on backend)
+    phone: '',
+    students: '',
+    status: 'Active',
+    address: '',
+    location_url: '',
+    image: ''
+  });
+
+  // Bulk Upload State
+  const [bulkData, setBulkData] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState(null);
+
+  // 1. Fetch Data (Dojo details + Instructors list)
   useEffect(() => {
-    if (isEditMode) {
-      const fetchData = async () => {
-        try {
-          const data = await getDojo(id);
-          setInitialData(data);
-        } catch (error) {
-          alert("Failed to load Dojo data");
-          navigate('/dojos');
-        }
-      };
-      fetchData();
-    }
-  }, [id]);
+    const fetchData = async () => {
+      try {
+        // Fetch Instructors for the dropdown
+        const instructorsData = await getInstructors();
+        setInstructorOptions(instructorsData);
 
-  const handleSubmit = async (formData) => {
+        // If Edit Mode, fetch Dojo details
+        if (isEditMode) {
+          const data = await getDojo(id);
+          setFormData({
+            name: data.name || '',
+            instructor: data.instructor || '', // Assumes backend returns name. If ID, adjust accordingly.
+            phone: data.phone || '',
+            students: data.students || 0,
+            status: data.status || 'Active',
+            address: data.address || '',
+            location_url: data.location_url || '',
+            image: data.image || ''
+          });
+        }
+      } catch (error) {
+        console.error("Failed to load data", error);
+        // Only redirect if fetching Dojo failed in Edit Mode
+        if (isEditMode) {
+             alert("Failed to load Dojo data");
+             navigate('/dojos');
+        }
+      }
+    };
+    fetchData();
+  }, [id, isEditMode, navigate]);
+
+  // 2. Handle Input Change
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 3. Handle Single Submit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
       if (isEditMode) {
         await updateDojo(id, formData);
@@ -38,110 +91,348 @@ export function AddDojo() {
     } catch (error) {
       console.error(error);
       alert("Operation failed. Check if all required fields are filled.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // --- UPDATED FIELDS LIST (All 8 Fields) ---
-  const fields = [
-    // 1. Name
-    { 
-      name: 'name', 
-      label: 'Dojo Name', 
-      type: 'text', 
-      placeholder: 'e.g. Miyagi-Do', 
-      icon: <Building2 size={20}/>, 
-      defaultValue: initialData?.name 
-    },
-    // 2. Instructor
-    { 
-      name: 'instructor', 
-      label: 'Head Instructor', 
-      type: 'text', 
-      placeholder: 'e.g. Daniel LaRusso', 
-      icon: <User size={20}/>, 
-      defaultValue: initialData?.instructor 
-    },
-    // 3. Phone
-    { 
-      name: 'phone', 
-      label: 'Phone Number', 
-      type: 'text', 
-      placeholder: '555-0199', 
-      icon: <Phone size={20}/>, 
-      defaultValue: initialData?.phone 
-    },
-    // 4. Students (New)
-    { 
-      name: 'students', 
-      label: 'Number of Students', 
-      type: 'number', 
-      placeholder: '0', 
-      icon: <Users size={20}/>, 
-      defaultValue: initialData?.students || 0
-    },
-    // 5. Status (New)
-    { 
-      name: 'status', 
-      label: 'Status', 
-      type: 'text', 
-      placeholder: 'Active or Inactive', 
-      icon: <Activity size={20}/>, 
-      defaultValue: initialData?.status || 'Active' 
-    },
-    // 6. Address
-    { 
-      name: 'address', 
-      label: 'Address (Optional)', 
-      type: 'text', 
-      placeholder: '123 Valley Rd', 
-      icon: <MapPin size={20}/>, 
-      required: false, 
-      defaultValue: initialData?.address 
-    },
-    // 7. Map Link
-    { 
-      name: 'location_url', 
-      label: 'Map Link (Optional)', 
-      type: 'url', 
-      placeholder: 'https://maps.google.com/...', 
-      icon: <LinkIcon size={20}/>, 
-      required: false, 
-      defaultValue: initialData?.location_url 
-    },
-    // 8. Image
-    { 
-      name: 'image', 
-      label: 'Image URL (Optional)', 
-      type: 'url', 
-      placeholder: 'https://...', 
-      icon: <ImageIcon size={20}/>, 
-      required: false, 
-      defaultValue: initialData?.image 
-    },
-  ];
+  // 4. Handle File Upload (Bulk)
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  if (isEditMode && !initialData) {
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      setBulkData(data);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // 5. Process Bulk Data
+  const processBulkUpload = async () => {
+    if (!confirm(`Are you sure you want to upload ${bulkData.length} dojos?`)) return;
+    
+    setBulkStatus('uploading');
+    let successCount = 0;
+    let errors = 0;
+
+    for (const row of bulkData) {
+      try {
+        const payload = {
+            name: row['Name'] || row['name'],
+            instructor: row['Instructor'] || row['instructor'],
+            phone: row['Phone'] || row['phone'],
+            students: row['Students'] || row['students'] || 0,
+            status: row['Status'] || row['status'] || 'Active',
+            address: row['Address'] || row['address'] || '',
+            location_url: row['Map Link'] || row['location_url'] || '',
+            image: row['Image'] || row['image'] || ''
+        };
+        await createDojo(payload);
+        successCount++;
+      } catch (err) {
+        console.error("Failed row:", row, err);
+        errors++;
+      }
+    }
+
+    setBulkStatus('success');
+    alert(`Upload Complete. Success: ${successCount}, Failed: ${errors}`);
+    if (successCount > 0) navigate('/dojos');
+  };
+
+  if (isEditMode && !formData.name) {
     return <div className="p-10 text-center">Loading...</div>;
   }
 
   return (
-    <div className="p-6 w-full">
-      <button onClick={() => navigate('/dojos')} className="flex items-center text-gray-500 hover:text-gray-800 mb-6 gap-2">
-        <ArrowLeft size={20} /> Back to List
-      </button>
+    <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+      
+      {/* Back Button */}
+      <div className="max-w-full mx-auto mb-6">
+        <button 
+          onClick={() => navigate('/dojos')}
+          className="flex items-center text-gray-600 hover:text-black transition-colors font-medium"
+        >
+          <ArrowLeft size={20} className="mr-2" /> Back to Dojo List
+        </button>
+      </div>
 
-      <Forms 
-        key={isEditMode ? initialData?.id : 'new'} 
-        title={isEditMode ? "Edit Dojo Details" : "Add New Dojo"}
-        subtitle={isEditMode ? "Update location information" : "Register a new branch"}
-        fields={fields}
-        onSubmit={handleSubmit}
-        submitLabel={isEditMode ? "Save Changes" : "Create Dojo"}
+      <div className="max-w-full mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         
-        // Use grid layout for better spacing of 8 fields
-        fullWidth={true} 
-        gridCols={2} 
-      />
+        {/* Card Header & Toggles */}
+        <div className="pt-8 pb-4 px-8 bg-white">
+            <div className="text-center mb-6">
+                <h1 className="text-3xl font-extrabold text-gray-900">
+                  {isEditMode ? "Edit Dojo Details" : "Add New Dojo"}
+                </h1>
+                <p className="mt-2 text-gray-500">
+                  {isEditMode ? "Update location information" : "Register a new branch"}
+                </p>
+            </div>
+
+            {/* Mode Toggle (Only show on Create Mode) */}
+            {!isEditMode && (
+              <div className="flex p-1 bg-gray-100 rounded-xl mx-auto max-w-sm mb-4">
+                  <button
+                      onClick={() => setMode('single')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                          mode === 'single' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                  >
+                      <Building2 size={18} /> Manual Entry
+                  </button>
+                  <button
+                      onClick={() => setMode('bulk')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all ${
+                          mode === 'bulk' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                  >
+                      <FileSpreadsheet size={18} /> Bulk Import
+                  </button>
+              </div>
+            )}
+        </div>
+
+        {/* Content Area */}
+        <div className="p-8 md:p-10 border-t border-gray-100">
+            
+            {/* --- MODE 1: SINGLE ENTRY FORM --- */}
+            {(mode === 'single' || isEditMode) && (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* Name */}
+                        <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Dojo Name</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Building2 className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input 
+                                    required
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-gray-900"
+                                    placeholder="e.g. Miyagi-Do"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Head Instructor (Dropdown) */}
+                        <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Head Instructor</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <User className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <select 
+                                    required
+                                    name="instructor"
+                                    value={formData.instructor}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none bg-white text-gray-900 appearance-none"
+                                >
+                                    <option value="">Select Instructor</option>
+                                    {instructorOptions.map((inst) => (
+                                        <option key={inst.id} value={inst.name}>
+                                            {inst.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Phone */}
+                        <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Phone className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input 
+                                    required
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-gray-900"
+                                    placeholder="555-0199"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Students Count */}
+                        <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Students</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Users className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input 
+                                    type="number"
+                                    name="students"
+                                    value={formData.students}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-gray-900"
+                                    placeholder="0"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Status (Dropdown) */}
+                        <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Activity className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <select 
+                                    name="status"
+                                    value={formData.status}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none bg-white text-gray-900 appearance-none"
+                                >
+                                  <option value="Active">Active</option>
+                                  <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Address */}
+                        <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Address</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <MapPin className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input 
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-gray-900"
+                                    placeholder="123 Valley Rd"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Map Link */}
+                        <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Map Link (Optional)</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <LinkIcon className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input 
+                                    type="url"
+                                    name="location_url"
+                                    value={formData.location_url}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-gray-900"
+                                    placeholder="https://maps.google.com..."
+                                />
+                            </div>
+                        </div>
+
+                         {/* Image URL */}
+                         <div className="col-span-1">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Image URL (Optional)</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <ImageIcon className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input 
+                                    type="url"
+                                    name="image"
+                                    value={formData.image}
+                                    onChange={handleChange}
+                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-gray-900"
+                                    placeholder="https://..."
+                                />
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        disabled={loading}
+                        className="w-full bg-red-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors shadow-lg hover:shadow-xl flex items-center justify-center gap-2 mt-8"
+                    >
+                        {loading ? <Loader2 className="animate-spin" /> : (isEditMode ? 'Save Changes' : 'Create Dojo')}
+                    </button>
+                </form>
+            )}
+
+            {/* --- MODE 2: BULK UPLOAD FORM --- */}
+            {mode === 'bulk' && !isEditMode && (
+                <div className="space-y-8 animate-in fade-in duration-300">
+                    <div className="text-center space-y-4">
+                        <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm inline-block">
+                            <span className="font-bold block mb-1">Instructions:</span>
+                            Upload an Excel (.xlsx) file with columns: <br/>
+                            <code className="bg-blue-100 px-1 rounded">Name, Instructor, Phone, Address, Status, Students</code>
+                        </div>
+
+                        <label className="block w-full border-2 border-dashed border-gray-300 rounded-2xl p-10 text-center cursor-pointer hover:border-red-500 hover:bg-red-50 transition-all group">
+                            <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-white group-hover:shadow-md transition-all">
+                                <Upload className="text-gray-400 group-hover:text-red-600" size={32} />
+                            </div>
+                            <span className="text-lg font-semibold text-gray-700 group-hover:text-gray-900">Click to upload Excel file</span>
+                            <p className="text-sm text-gray-400 mt-1">or drag and drop here</p>
+                            <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
+                        </label>
+                    </div>
+
+                    {bulkData.length > 0 && (
+                        <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <CheckCircle size={20} className="text-green-600" />
+                                    {bulkData.length} Dojos Ready
+                                </h3>
+                                <button onClick={() => setBulkData([])} className="text-sm text-red-600 hover:text-red-800 font-medium hover:underline">Clear Data</button>
+                            </div>
+
+                            <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-6">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-50 text-gray-500 font-medium">
+                                        <tr>
+                                            <th className="p-3">Name</th>
+                                            <th className="p-3">Instructor</th>
+                                            <th className="p-3">Phone</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {bulkData.map((row, i) => (
+                                            <tr key={i}>
+                                                <td className="p-3 font-medium text-gray-900">{row.Name || row.name}</td>
+                                                <td className="p-3 text-gray-600">{row.Instructor || row.instructor}</td>
+                                                <td className="p-3 text-gray-600">{row.Phone || row.phone}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <button 
+                                onClick={processBulkUpload}
+                                disabled={bulkStatus === 'uploading'}
+                                className="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                            >
+                                {bulkStatus === 'uploading' ? <Loader2 className="animate-spin" /> : 'Confirm Bulk Import'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+      </div>
     </div>
   );
 }

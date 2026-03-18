@@ -140,5 +140,40 @@ export const deleteInstructor = async (id) => {
   const response = await api.delete(`/instructors/${id}`);
   return response.data;
 };
+// Student API functions
+export const getStudents = async () => {
+  const response = await api.get('/students');
+  return response.data;
+};
+export const getStudent = async (id) => {
+  const response = await api.get(`/students/${id}`);
+  return response.data;
+}
+export const createStudent = async (studentData) => {
+  try {
+    const response = await api.post('/students', studentData); 
+    return response.data;
+  } catch (error) {
+    console.error("Server Error Details:", error.response?.data);
+    throw error;
+  } 
+};
 
+export const updateStudent = async (id, studentData) => {
+  try {
+    const response = await api.put(`/students/${id}`, studentData);
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error.message;
+  }
+};
+
+export const deleteStudent = async (id) => {
+  try {
+    const response = await api.delete(`/students/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error.response ? error.response.data : error.message;
+  }
+};
 export default api;
