@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Building2, User, Phone, MapPin, Link as LinkIcon, Image as ImageIcon, 
-  ArrowLeft, Users, Activity, Upload, FileSpreadsheet, CheckCircle, Loader2 
+  ArrowLeft, Activity, Upload, FileSpreadsheet, CheckCircle, Loader2 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-// Added getInstructors to imports
 import { createDojo, getDojo, updateDojo, getInstructors } from '../../api-service/api';
 
 export function AddDojo() {
@@ -14,43 +13,36 @@ export function AddDojo() {
   const isEditMode = !!id;
   
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState('single'); // 'single' or 'bulk'
+  const [mode, setMode] = useState('single'); 
   
-  // State for Instructor Dropdown
   const [instructorOptions, setInstructorOptions] = useState([]);
 
-  // Single Form State
+  // FIXED: Changed 'instructor' to 'instructor_id'
   const [formData, setFormData] = useState({
     name: '',
-    instructor: '', // This will now store the Instructor Name (or ID depending on backend)
+    instructor_id: '', 
     phone: '',
-    students: '',
     status: 'Active',
     address: '',
     location_url: '',
     image: ''
   });
 
-  // Bulk Upload State
   const [bulkData, setBulkData] = useState([]);
   const [bulkStatus, setBulkStatus] = useState(null);
 
-  // 1. Fetch Data (Dojo details + Instructors list)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch Instructors for the dropdown
         const instructorsData = await getInstructors();
         setInstructorOptions(instructorsData);
 
-        // If Edit Mode, fetch Dojo details
         if (isEditMode) {
           const data = await getDojo(id);
           setFormData({
             name: data.name || '',
-            instructor: data.instructor || '', // Assumes backend returns name. If ID, adjust accordingly.
+            instructor_id: data.instructor_id || '', // FIXED: Use ID
             phone: data.phone || '',
-            students: data.students || 0,
             status: data.status || 'Active',
             address: data.address || '',
             location_url: data.location_url || '',
@@ -59,7 +51,6 @@ export function AddDojo() {
         }
       } catch (error) {
         console.error("Failed to load data", error);
-        // Only redirect if fetching Dojo failed in Edit Mode
         if (isEditMode) {
              alert("Failed to load Dojo data");
              navigate('/dojos');
@@ -69,13 +60,11 @@ export function AddDojo() {
     fetchData();
   }, [id, isEditMode, navigate]);
 
-  // 2. Handle Input Change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 3. Handle Single Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -96,7 +85,6 @@ export function AddDojo() {
     }
   };
 
-  // 4. Handle File Upload (Bulk)
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -111,11 +99,11 @@ export function AddDojo() {
       setBulkData(data);
     };
     reader.readAsBinaryString(file);
+    e.target.value = null; 
   };
 
-  // 5. Process Bulk Data
   const processBulkUpload = async () => {
-    if (!confirm(`Are you sure you want to upload ${bulkData.length} dojos?`)) return;
+    if (!window.confirm(`Are you sure you want to upload ${bulkData.length} dojos?`)) return;
     
     setBulkStatus('uploading');
     let successCount = 0;
@@ -123,11 +111,18 @@ export function AddDojo() {
 
     for (const row of bulkData) {
       try {
+        // FIXED: Match Excel Instructor Name to the actual Database ID
+        const excelInstName = row['Instructor'] || row['instructor'];
+        const matchedInst = instructorOptions.find(
+            i => i.name?.toLowerCase() === excelInstName?.toLowerCase()
+        );
+        // Fallback to the first available instructor if no match is found
+        const finalInstructorId = matchedInst ? matchedInst.id : (instructorOptions.length > 0 ? instructorOptions[0].id : null);
+
         const payload = {
             name: row['Name'] || row['name'],
-            instructor: row['Instructor'] || row['instructor'],
+            instructor_id: finalInstructorId, // Sending ID now!
             phone: row['Phone'] || row['phone'],
-            students: row['Students'] || row['students'] || 0,
             status: row['Status'] || row['status'] || 'Active',
             address: row['Address'] || row['address'] || '',
             location_url: row['Map Link'] || row['location_url'] || '',
@@ -147,25 +142,20 @@ export function AddDojo() {
   };
 
   if (isEditMode && !formData.name) {
-    return <div className="p-10 text-center">Loading...</div>;
+    return <div className="p-10 text-center flex flex-col items-center justify-center text-gray-500"><Loader2 className="animate-spin mb-2" /> Loading...</div>;
   }
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
       
-      {/* Back Button */}
       <div className="max-w-full mx-auto mb-6">
-        <button 
-          onClick={() => navigate('/dojos')}
-          className="flex items-center text-gray-600 hover:text-black transition-colors font-medium"
-        >
+        <button onClick={() => navigate('/dojos')} className="flex items-center text-gray-600 hover:text-black transition-colors font-medium">
           <ArrowLeft size={20} className="mr-2" /> Back to Dojo List
         </button>
       </div>
 
       <div className="max-w-full mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
         
-        {/* Card Header & Toggles */}
         <div className="pt-8 pb-4 px-8 bg-white">
             <div className="text-center mb-6">
                 <h1 className="text-3xl font-extrabold text-gray-900">
@@ -176,7 +166,6 @@ export function AddDojo() {
                 </p>
             </div>
 
-            {/* Mode Toggle (Only show on Create Mode) */}
             {!isEditMode && (
               <div className="flex p-1 bg-gray-100 rounded-xl mx-auto max-w-sm mb-4">
                   <button
@@ -199,15 +188,12 @@ export function AddDojo() {
             )}
         </div>
 
-        {/* Content Area */}
         <div className="p-8 md:p-10 border-t border-gray-100">
             
-            {/* --- MODE 1: SINGLE ENTRY FORM --- */}
             {(mode === 'single' || isEditMode) && (
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         
-                        {/* Name */}
                         <div className="col-span-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Dojo Name</label>
                             <div className="relative">
@@ -225,7 +211,7 @@ export function AddDojo() {
                             </div>
                         </div>
 
-                        {/* Head Instructor (Dropdown) */}
+                        {/* FIXED: Dropdown binds to instructor_id and sets value to inst.id */}
                         <div className="col-span-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Head Instructor</label>
                             <div className="relative">
@@ -234,14 +220,14 @@ export function AddDojo() {
                                 </div>
                                 <select 
                                     required
-                                    name="instructor"
-                                    value={formData.instructor}
+                                    name="instructor_id" 
+                                    value={formData.instructor_id}
                                     onChange={handleChange}
                                     className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none bg-white text-gray-900 appearance-none"
                                 >
                                     <option value="">Select Instructor</option>
                                     {instructorOptions.map((inst) => (
-                                        <option key={inst.id} value={inst.name}>
+                                        <option key={inst.id} value={inst.id}>
                                             {inst.name}
                                         </option>
                                     ))}
@@ -249,7 +235,6 @@ export function AddDojo() {
                             </div>
                         </div>
 
-                        {/* Phone */}
                         <div className="col-span-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
                             <div className="relative">
@@ -267,25 +252,6 @@ export function AddDojo() {
                             </div>
                         </div>
 
-                        {/* Students Count */}
-                        <div className="col-span-1">
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Students</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Users className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <input 
-                                    type="number"
-                                    name="students"
-                                    value={formData.students}
-                                    onChange={handleChange}
-                                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-gray-900"
-                                    placeholder="0"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Status (Dropdown) */}
                         <div className="col-span-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                             <div className="relative">
@@ -304,7 +270,6 @@ export function AddDojo() {
                             </div>
                         </div>
 
-                        {/* Address */}
                         <div className="col-span-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Address</label>
                             <div className="relative">
@@ -321,7 +286,6 @@ export function AddDojo() {
                             </div>
                         </div>
 
-                        {/* Map Link */}
                         <div className="col-span-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Map Link (Optional)</label>
                             <div className="relative">
@@ -339,7 +303,6 @@ export function AddDojo() {
                             </div>
                         </div>
 
-                         {/* Image URL */}
                          <div className="col-span-1">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Image URL (Optional)</label>
                             <div className="relative">
@@ -369,14 +332,13 @@ export function AddDojo() {
                 </form>
             )}
 
-            {/* --- MODE 2: BULK UPLOAD FORM --- */}
             {mode === 'bulk' && !isEditMode && (
                 <div className="space-y-8 animate-in fade-in duration-300">
                     <div className="text-center space-y-4">
                         <div className="bg-blue-50 text-blue-800 p-4 rounded-lg text-sm inline-block">
                             <span className="font-bold block mb-1">Instructions:</span>
                             Upload an Excel (.xlsx) file with columns: <br/>
-                            <code className="bg-blue-100 px-1 rounded">Name, Instructor, Phone, Address, Status, Students</code>
+                            <code className="bg-blue-100 px-1 rounded font-mono">Name, Instructor, Phone, Address, Status</code>
                         </div>
 
                         <label className="block w-full border-2 border-dashed border-gray-300 rounded-2xl p-10 text-center cursor-pointer hover:border-red-500 hover:bg-red-50 transition-all group">
@@ -401,16 +363,16 @@ export function AddDojo() {
 
                             <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-6">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-50 text-gray-500 font-medium">
+                                    <thead className="bg-gray-50 text-gray-500 font-medium sticky top-0">
                                         <tr>
-                                            <th className="p-3">Name</th>
-                                            <th className="p-3">Instructor</th>
-                                            <th className="p-3">Phone</th>
+                                            <th className="p-3 border-b">Name</th>
+                                            <th className="p-3 border-b">Instructor</th>
+                                            <th className="p-3 border-b">Phone</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {bulkData.map((row, i) => (
-                                            <tr key={i}>
+                                            <tr key={i} className="hover:bg-gray-50">
                                                 <td className="p-3 font-medium text-gray-900">{row.Name || row.name}</td>
                                                 <td className="p-3 text-gray-600">{row.Instructor || row.instructor}</td>
                                                 <td className="p-3 text-gray-600">{row.Phone || row.phone}</td>

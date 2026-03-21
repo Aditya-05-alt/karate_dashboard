@@ -19,4 +19,14 @@ class Instructor extends Model
         'image',
         'dob'
     ];
+    public function dojos()
+    {
+        return $this->hasMany(Dojo::class);
+    }
+
+    // An Instructor has many Students
+    public function students()
+    {
+        return $this->hasMany(Student::class);
+    }
 }

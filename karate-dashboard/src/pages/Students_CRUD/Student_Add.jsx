@@ -11,8 +11,8 @@ import { getDojos, getInstructors, createStudent, getStudent, updateStudent } fr
 
 const RANKS = [
   'White', 'Yellow', 'Yellow Stripe', 'Orange', 'Green', 
-  'Green Stripe', 'Blue', 'Purple', 'Brown', 
-  'Brown Stripe 1', 'Brown Stripe 2', 'Black'
+  'Green Stripe', 'Blue', 'Purple', 'Brown 3rd Kyu', 
+  'Brown 2nd Kyu', 'Brown 1st Kyu', 'Black (Shodan)', 'Black (Nidan)', 'Black (Sandan)', 'Black (Yondan)'
 ];
 
 const STATUS_OPTIONS = ['Active', 'Inactive', 'Suspended'];

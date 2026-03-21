@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Building2, MapPin, Phone, Edit, Trash2, Users, ExternalLink, X, Calendar, CheckCircle, Activity, Ban, Map } from 'lucide-react';
+import { Building2, MapPin, Phone, Edit, Trash2, Users, ExternalLink, X, Calendar, CheckCircle, Activity, Ban, Map, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Table from '../../components/Table';
 import SearchBar from '../../components/SearchBar';
-import FilterComponent from '../../components/FilterComponent'; // Import Filter
-import { getDojos, deleteDojo, getInstructors } from '../../api-service/api'; // Import getInstructors
+import FilterComponent from '../../components/FilterComponent';
+import { getDojos, deleteDojo, getInstructors } from '../../api-service/api';
 
-// --- STAT CARD COMPONENT ---
 export const StatCard = ({ icon, title, value, color }) => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 transition-transform hover:-translate-y-1">
     <div className={`p-3 rounded-lg ${color} text-white`}>
@@ -20,11 +19,11 @@ export const StatCard = ({ icon, title, value, color }) => (
 );
 
 export function DojoView() {
+  const navigate = useNavigate();
   const [dojos, setDojos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedInstructor, setSelectedInstructor] = useState(''); // State for filter
+  const [selectedInstructor, setSelectedInstructor] = useState(''); 
   const [selectedDojo, setSelectedDojo] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadDojos();
@@ -40,7 +39,7 @@ export function DojoView() {
   };
 
   const handleDelete = async (id) => {
-    if (confirm("Delete this Dojo?")) {
+    if (window.confirm("Delete this Dojo?")) {
       await deleteDojo(id);
       loadDojos();
     }
@@ -53,25 +52,19 @@ export function DojoView() {
     const inactive = total - active;
     
     const uniqueLocs = new Set(
-      dojos
-        .map(d => d.address?.trim())
-        .filter(addr => addr && addr.length > 0)
+      dojos.map(d => d.address?.trim()).filter(addr => addr && addr.length > 0)
     ).size;
 
     return { total, active, inactive, uniqueLocs };
   }, [dojos]);
 
-  // --- FILTERING LOGIC ---
   const filteredDojos = useMemo(() => {
     return dojos.filter(d => {
-      // 1. Search Filter (Name or Instructor Name)
       const matchesSearch = 
         d.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         d.instructor.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // 2. Dropdown Filter (Instructor Name)
       const matchesInstructor = selectedInstructor ? d.instructor === selectedInstructor : true;
-
       return matchesSearch && matchesInstructor;
     });
   }, [dojos, searchTerm, selectedInstructor]);
@@ -115,7 +108,16 @@ export function DojoView() {
         </div>
       )
     },
-    { label: 'Students', key: 'students', sortable: true, render: (row) => <span className="flex items-center gap-1"><Users size={14} className="text-gray-400"/> {row.students}</span> },
+    { 
+        label: 'Active Students', // Renamed for clarity
+        key: 'students', 
+        sortable: true, 
+        render: (row) => (
+            <span className="flex items-center gap-1 font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-md w-fit">
+                <Users size={14} /> {row.students}
+            </span>
+        ) 
+    },
     { 
       label: 'Status', 
       key: 'status', 
@@ -139,7 +141,7 @@ export function DojoView() {
         </div>
       )
     }
-  ], []);
+  ], [navigate]);
 
   return (
     <div className="p-6 space-y-8 relative">
@@ -156,11 +158,9 @@ export function DojoView() {
             </div>
         </div>
         
-        {/* Search & Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-end sm:items-center">
             <SearchBar onSearch={setSearchTerm} />
 
-            {/* --- NEW: Instructor Filter --- */}
             <FilterComponent 
                 label="Instructor" 
                 api={getInstructors} 
@@ -177,50 +177,23 @@ export function DojoView() {
 
       {/* 2. Stats Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Total Dojos" 
-          value={stats.total} 
-          icon={<Building2 size={24} />} 
-          color="bg-blue-500" 
-        />
-        <StatCard 
-          title="Total Active" 
-          value={stats.active} 
-          icon={<Activity size={24} />} 
-          color="bg-green-500" 
-        />
-        <StatCard 
-          title="Total Inactive" 
-          value={stats.inactive} 
-          icon={<Ban size={24} />} 
-          color="bg-red-500" 
-        />
-        <StatCard 
-          title="Total Locations" 
-          value={stats.uniqueLocs} 
-          icon={<Map size={24} />} 
-          color="bg-purple-500" 
-        />
+        <StatCard title="Total Dojos" value={stats.total} icon={<Building2 size={24} />} color="bg-blue-500" />
+        <StatCard title="Total Active" value={stats.active} icon={<Activity size={24} />} color="bg-green-500" />
+        <StatCard title="Total Inactive" value={stats.inactive} icon={<Ban size={24} />} color="bg-red-500" />
+        <StatCard title="Total Locations" value={stats.uniqueLocs} icon={<Map size={24} />} color="bg-purple-500" />
       </div>
 
       {/* 3. Table Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <Table 
-          columns={columns} 
-          data={filteredDojos} 
-          onRowClick={(row) => setSelectedDojo(row)} 
-        />
+        <Table columns={columns} data={filteredDojos} onRowClick={(row) => setSelectedDojo(row)} />
       </div>
 
       {/* 4. Details Popup Modal */}
       {selectedDojo && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedDojo(null)}>
+        <div className="fixed inset-0 bg-transparent bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedDojo(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden relative" onClick={(e) => e.stopPropagation()}>
             
-            <button 
-              onClick={() => setSelectedDojo(null)}
-              className="absolute top-4 right-4 z-10 bg-white/80 p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
+            <button onClick={() => setSelectedDojo(null)} className="absolute top-4 right-4 z-10 bg-white/80 p-2 rounded-full hover:bg-gray-100 transition-colors">
               <X size={20} />
             </button>
 
@@ -234,21 +207,21 @@ export function DojoView() {
               )}
               <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/60 to-transparent p-6 pt-16">
                  <h2 className="text-2xl font-bold text-white">{selectedDojo.name}</h2>
-                 <p className="text-gray-200 text-sm">Head Instructor: {selectedDojo.instructor}</p>
+                 <p className="text-gray-200 text-sm flex items-center gap-1 mt-1">
+                    <User size={14}/> Head Instructor: {selectedDojo.instructor}
+                 </p>
               </div>
             </div>
 
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1 ${
-                  selectedDojo.status === 'Active' 
-                    ? 'bg-green-50 text-green-700 border-green-200' 
-                    : 'bg-red-50 text-red-700 border-red-200'
+                  selectedDojo.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
                 }`}>
                    <CheckCircle size={12} /> {selectedDojo.status}
                 </span>
-                <span className="text-sm text-gray-500 flex items-center gap-1">
-                   <Users size={16} /> {selectedDojo.students} Students
+                <span className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full flex items-center gap-2">
+                   <Users size={16} /> {selectedDojo.students} Active Students
                 </span>
               </div>
 
@@ -256,16 +229,15 @@ export function DojoView() {
                 <div className="bg-gray-50 p-3 rounded-lg">
                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Phone</p>
                    <div className="flex items-center gap-2 text-gray-800">
-                      <Phone size={16} className="text-red-500" />
-                      {selectedDojo.phone}
+                      <Phone size={16} className="text-red-500" /> {selectedDojo.phone}
                    </div>
                 </div>
                 
                 <div className="bg-gray-50 p-3 rounded-lg">
                    <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Registered</p>
                    <div className="flex items-center gap-2 text-gray-800">
-                      <Calendar size={16} className="text-red-500" />
-                      {new Date(selectedDojo.created_at).toLocaleDateString()}
+                      <Calendar size={16} className="text-red-500" /> 
+                      {selectedDojo.created_at ? new Date(selectedDojo.created_at).toLocaleDateString() : 'N/A'}
                    </div>
                 </div>
               </div>
@@ -279,22 +251,14 @@ export function DojoView() {
                 </p>
                 
                 {selectedDojo.location_url && (
-                  <a 
-                    href={selectedDojo.location_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 bg-blue-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full justify-center"
-                  >
+                  <a href={selectedDojo.location_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 bg-blue-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors w-full justify-center">
                     <ExternalLink size={16} /> View on Google Maps
                   </a>
                 )}
               </div>
 
               <div className="flex gap-3 pt-2">
-                 <button 
-                   onClick={() => navigate(`/dojos/edit/${selectedDojo.id}`)}
-                   className="flex-1 bg-black text-white py-2.5 rounded-xl font-medium hover:bg-gray-800 transition-colors"
-                 >
+                 <button onClick={() => navigate(`/dojos/edit/${selectedDojo.id}`)} className="flex-1 bg-black text-white py-2.5 rounded-xl font-medium hover:bg-gray-800 transition-colors">
                    Edit Details
                  </button>
               </div>

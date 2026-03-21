@@ -11,33 +11,53 @@ class InstructorController extends Controller
     // GET /api/instructors
     public function index()
     {
-        return response()->json(Instructor::all(), 200);
+        // 1. Fetch instructors and dynamically COUNT their related students and dojos
+        $instructors = Instructor::withCount(['students', 'dojos'])->get();
+
+        // 2. Map the data so React gets the counts easily
+        $mappedInstructors = $instructors->map(function($instructor) {
+            return [
+                'id'       => $instructor->id,
+                'name'     => $instructor->name,
+                'rank'     => $instructor->rank,
+                'age'      => $instructor->age,
+                'email'    => $instructor->email,
+                'phone'    => $instructor->phone,
+                'status'   => $instructor->status,
+                'image'    => $instructor->image,
+                'dob'      => $instructor->dob,
+                // THE MAGIC: Appending the dynamic counts
+                'students' => $instructor->students_count,
+                'dojos'    => $instructor->dojos_count,
+            ];
+        });
+
+        return response()->json($mappedInstructors, 200);
     }
 
     // POST /api/instructors
     public function store(Request $request)
     {
-        // All fields are required as per your request
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'rank' => 'required|string|max:255',
-            'age' => 'required|integer|min:18',
-            'email' => 'required|email|unique:instructors,email',
-            'phone' => 'required|string|max:20',
+            'name'   => 'required|string|max:255',
+            'rank'   => 'required|string|max:255',
+            'age'    => 'required|integer|min:18',
+            'email'  => 'required|email|unique:instructors,email',
+            'phone'  => 'required|string|max:20',
             'status' => 'required|string',
-            'image' => 'required|url',
-            'dob' => 'required|date',
+            'image'  => 'required|url',
+            'dob'    => 'required|date',
         ]);
 
         $instructor = Instructor::create($validated);
-
         return response()->json($instructor, 201);
     }
 
     // GET /api/instructors/{id}
     public function show($id)
     {
-        $instructor = Instructor::find($id);
+        // Also fetch counts when viewing a single instructor just in case
+        $instructor = Instructor::withCount(['students', 'dojos'])->find($id);
         if (!$instructor) {
             return response()->json(['message' => 'Instructor not found'], 404);
         }
@@ -53,18 +73,17 @@ class InstructorController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'rank' => 'required|string|max:255',
-            'age' => 'required|integer',
-            'email' => 'required|email|unique:instructors,email,' . $id, // Ignore current ID for unique check
-            'phone' => 'required|string',
+            'name'   => 'required|string|max:255',
+            'rank'   => 'required|string|max:255',
+            'age'    => 'required|integer',
+            'email'  => 'required|email|unique:instructors,email,' . $id,
+            'phone'  => 'required|string',
             'status' => 'required|string',
-            'image' => 'required|url',
-            'dob' => 'required|date',
+            'image'  => 'required|url',
+            'dob'    => 'required|date',
         ]);
 
         $instructor->update($validated);
-
         return response()->json($instructor, 200);
     }
 
