@@ -3,7 +3,6 @@ import { Building2, MapPin, Phone, Edit, Trash2, Users, ExternalLink, X, Calenda
 import { useNavigate } from 'react-router-dom';
 import Table from '../../components/Table';
 import SearchBar from '../../components/SearchBar';
-import FilterComponent from '../../components/FilterComponent';
 import { getDojos, deleteDojo, getInstructors } from '../../api-service/api';
 
 export const StatCard = ({ icon, title, value, color }) => (
@@ -21,12 +20,15 @@ export const StatCard = ({ icon, title, value, color }) => (
 export function DojoView() {
   const navigate = useNavigate();
   const [dojos, setDojos] = useState([]);
+  const [instructorsList, setInstructorsList] = useState([]); // Added state to hold instructors for the dropdown
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInstructor, setSelectedInstructor] = useState(''); 
   const [selectedDojo, setSelectedDojo] = useState(null);
 
   useEffect(() => {
     loadDojos();
+    loadInstructorsForDropdown(); // Fetch instructors once when page loads
   }, []);
 
   const loadDojos = async () => {
@@ -37,6 +39,16 @@ export function DojoView() {
       console.error("Failed to load dojos", err);
     }
   };
+
+  // Fetch instructors to populate the native dropdown safely
+  const loadInstructorsForDropdown = async () => {
+    try {
+      const data = await getInstructors();
+      setInstructorsList(data);
+    } catch (err) {
+      console.error("Failed to load instructors", err);
+    }
+  }
 
   const handleDelete = async (id) => {
     if (window.confirm("Delete this Dojo?")) {
@@ -81,7 +93,18 @@ export function DojoView() {
             </div>
             <div>
                 <span className="font-bold text-gray-800 block">{row.name}</span>
-                <span className="text-xs text-gray-500">Sensei: {row.instructor}</span>
+            </div>
+        </div>
+      )
+    },
+     { 
+      label: 'Dojo Sensei', 
+      key: 'instructor', 
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-3">
+            <div>
+                <span className="font-semibold text-gray-800 block">Sensei {row.instructor}</span>
             </div>
         </div>
       )
@@ -109,7 +132,7 @@ export function DojoView() {
       )
     },
     { 
-        label: 'Active Students', // Renamed for clarity
+        label: 'Active Students', 
         key: 'students', 
         sortable: true, 
         render: (row) => (
@@ -161,13 +184,22 @@ export function DojoView() {
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-end sm:items-center">
             <SearchBar onSearch={setSearchTerm} />
 
-            <FilterComponent 
-                label="Instructor" 
-                api={getInstructors} 
-                displayKey="name"
-                valueKey="name"
-                onFilterChange={setSelectedInstructor} 
-            />
+            {/* --- FIXED: Replaced FilterComponent with Native Select Dropdown --- */}
+            <div className="relative w-full sm:w-48">
+                <select
+                    value={selectedInstructor}
+                    onChange={(e) => setSelectedInstructor(e.target.value)}
+                    className="appearance-none w-full border border-gray-300 bg-white text-gray-700 pl-4 pr-10 py-2.5 rounded-lg text-sm focus:ring-2 focus:ring-red-600 outline-none shadow-sm font-medium cursor-pointer"
+                >
+                    <option value="">All Instructors</option>
+                    {instructorsList.map(inst => (
+                        <option key={inst.id} value={inst.name}>{inst.name}</option>
+                    ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                </div>
+            </div>
             
             <button onClick={() => navigate('/dojos/create')} className="bg-red-600 text-white px-5 py-2.5 rounded-lg hover:bg-red-700 shadow-sm font-medium flex items-center justify-center gap-2 whitespace-nowrap">
                 <span>+ Add Dojo</span>
@@ -208,7 +240,7 @@ export function DojoView() {
               <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/60 to-transparent p-6 pt-16">
                  <h2 className="text-2xl font-bold text-white">{selectedDojo.name}</h2>
                  <p className="text-gray-200 text-sm flex items-center gap-1 mt-1">
-                    <User size={14}/> Head Instructor: {selectedDojo.instructor}
+                    <User size={14}/> Head Instructor: Sensei {selectedDojo.instructor}
                  </p>
               </div>
             </div>

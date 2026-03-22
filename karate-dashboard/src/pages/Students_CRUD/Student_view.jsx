@@ -14,21 +14,41 @@ import { getStudents, getDojos, getInstructors, deleteStudent } from '../../api-
 // Static Rank Data for the Filter
 const RANKS = [
   'White', 'Yellow', 'Yellow Stripe', 'Orange', 'Green', 
-  'Green Stripe', 'Blue', 'Purple', 'Brown', 
-  'Brown Stripe 1', 'Brown Stripe 2', 'Black'
+  'Green Stripe', 'Blue', 'Purple', 'Brown 3rd Kyu', 
+  'Brown 2nd Kyu', 'Brown 1st Kyu', 'Black (Shodan)', 'Black (Nidan)', 'Black (Sandan)', 'Black (Yondan)'
 ];
 
-// Helper to style Rank Pills exactly like your screenshot
+// Helper to style Rank Pills exactly matching the new array
 const getRankStyle = (rank) => {
   const r = rank?.toLowerCase() || '';
-  if (r.includes('black')) return 'bg-black text-white';
-  if (r.includes('brown')) return 'bg-[#5D4037] text-white'; // Brown color
-  if (r.includes('purple')) return 'bg-purple-600 text-white';
-  if (r.includes('blue')) return 'bg-blue-600 text-white';
-  if (r.includes('green')) return 'bg-green-600 text-white';
-  if (r.includes('orange')) return 'bg-orange-500 text-white';
-  if (r.includes('yellow')) return 'bg-yellow-400 text-yellow-900';
-  return 'bg-gray-100 text-gray-800 border border-gray-200'; // White / Default
+  
+  // Black Belts (Shodan, Nidan, Sandan, Yondan)
+  if (r.includes('black')) return 'bg-black text-white shadow-sm';
+  
+  // Brown Belts (1st, 2nd, 3rd Kyu)
+  if (r.includes('brown')) return 'bg-[#795548] text-white shadow-sm'; 
+  
+  // Purple
+  if (r.includes('purple')) return 'bg-purple-600 text-white shadow-sm';
+  
+  // Blue
+  if (r.includes('blue')) return 'bg-blue-600 text-white shadow-sm';
+  
+  // Green & Green Stripe
+  if (r.includes('green stripe')) return 'bg-green-600 text-white border-b-4 border-white shadow-sm';
+  if (r.includes('green')) return 'bg-green-600 text-white shadow-sm';
+  
+  // Orange
+  if (r.includes('orange')) return 'bg-orange-500 text-white shadow-sm';
+  
+  // Yellow & Yellow Stripe
+  if (r.includes('yellow stripe')) return 'bg-yellow-400 text-yellow-900 border-b-4 border-white shadow-sm';
+  if (r.includes('yellow')) return 'bg-yellow-400 text-yellow-900 shadow-sm';
+  
+  // White & Default
+  if (r.includes('white')) return 'bg-white text-gray-800 border-2 border-gray-200 shadow-sm';
+  
+  return 'bg-gray-100 text-gray-800 border border-gray-200'; 
 };
 
 export function StudentView() {

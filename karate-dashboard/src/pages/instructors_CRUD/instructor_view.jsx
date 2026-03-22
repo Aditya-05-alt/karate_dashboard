@@ -1,34 +1,63 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   UserCheck, Shield, GraduationCap, Medal, Loader2, 
-  Users, Building2, Phone, Mail, Calendar, Edit, Trash2, User 
+  Users, Building2, Phone, Mail, Calendar, Edit, Trash2, User, Search, Filter 
 } from 'lucide-react';
 import Table from '../../components/Table';
 import { StatCard } from '../../components/StatCard';
 import { useNavigate } from 'react-router-dom';
-import { getInstructors, deleteInstructor } from '../../api-service/api';
-import BeltBadge from '../../components/Beltbadge';
+import { getInstructors, deleteInstructor, getDojos } from '../../api-service/api';
+import FilterComponent from '../../components/FilterComponent';
+
+// 1. Updated Ranks
+const RANKS = [
+  'Black (Shodan)', 'Black (Nidan)', 'Black (Sandan)', 
+  'Black (Yondan)', 'Black (Godan)', 'Shihan', 'Kyoshi'
+];
+
+// Helper to style the belts with Black + Yellow stripes
+const getRankStyle = (rank) => {
+  const r = rank?.toLowerCase() || '';
+  
+  if (r.includes('shihan') || r.includes('kyoshi')) {
+      return 'bg-black text-white border-b-4 border-yellow-400 shadow-sm';
+  }
+  if (r.includes('black')) {
+      return 'bg-black text-white shadow-sm';
+  }
+  return 'bg-gray-100 text-gray-800 border border-gray-200'; 
+};
 
 export function InstructorView() {
   const navigate = useNavigate();
   
+  // Data States
   const [instructors, setInstructors] = useState([]);
+  const [dojosList, setDojosList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedInstructor, setSelectedInstructor] = useState(null);
+  
+  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDojo, setSelectedDojo] = useState('');
+  const [selectedRank, setSelectedRank] = useState('');
 
-  // 1. Fetch Data
+  // 1. Fetch Data Once
   useEffect(() => {
-    loadInstructors();
+    loadData();
   }, []);
 
-  const loadInstructors = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
-      const data = await getInstructors();
-      setInstructors(data);
+      const [instData, dojoData] = await Promise.all([
+          getInstructors(),
+          getDojos()
+      ]);
+      setInstructors(instData);
+      setDojosList(dojoData);
     } catch (error) {
-      console.error("Failed to fetch instructors:", error);
+      console.error("Failed to fetch data:", error);
     } finally {
       setLoading(false);
     }
@@ -39,7 +68,7 @@ export function InstructorView() {
     if (window.confirm("Are you sure you want to delete this Instructor?")) {
       try {
         await deleteInstructor(id);
-        loadInstructors(); // Refresh table after deletion
+        loadData(); 
       } catch (err) {
         console.error("Failed to delete instructor", err);
         alert("Failed to delete instructor.");
@@ -51,16 +80,28 @@ export function InstructorView() {
   const stats = useMemo(() => {
     const total = instructors.length;
     const active = instructors.filter(i => i.status === 'Active').length; 
-    const highRank = instructors.filter(i => i.rank?.includes('Black')).length;
+    const highRank = instructors.filter(i => i.rank?.includes('Shihan') || i.rank?.includes('Kyoshi')).length;
 
     return [
       { icon: <UserCheck size={24} />, title: "Total Instructors", value: total.toString(), color: "bg-blue-600" },
       { icon: <Shield size={24} />, title: "Active Senseis", value: active.toString(), color: "bg-green-600" },
-      { icon: <Medal size={24} />, title: "High Rank (Black)", value: highRank.toString(), color: "bg-black" }
+      { icon: <Medal size={24} />, title: "Masters (Kyoshi/Shihan)", value: highRank.toString(), color: "bg-black" }
     ];
   }, [instructors]);
 
-  // 4. Inline Table Columns definition (Showing Counts & Actions)
+  // 4. Apply Search & Filters
+  const filteredInstructors = useMemo(() => {
+    return instructors.filter(instructor => {
+      const matchesSearch = instructor.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            instructor.phone.includes(searchTerm);
+      const matchesRank = selectedRank ? instructor.rank === selectedRank : true;
+      const matchesDojo = selectedDojo ? instructor.dojo?.includes(selectedDojo) : true; 
+      
+      return matchesSearch && matchesRank && matchesDojo;
+    });
+  }, [instructors, searchTerm, selectedRank, selectedDojo]);
+
+  // 5. Inline Table Columns definition
   const columns = useMemo(() => [
     { 
       label: 'INSTRUCTOR', 
@@ -83,7 +124,7 @@ export function InstructorView() {
       key: 'rank', 
       sortable: true,
       render: (row) => (
-          <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wide">
+          <span className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide inline-block ${getRankStyle(row.rank)}`}>
               {row.rank}
           </span>
       )
@@ -98,9 +139,30 @@ export function InstructorView() {
         </div>
       )
     },
-    // --- NEW: Live Dojo Count Column ---
+    // --- UPDATED: Multiple Dojo Badges ---
     { 
-        label: 'DOJOS', 
+        label: 'DOJO', 
+        key: 'dojo', 
+        render: (row) => {
+            const dojoList = row.dojo && row.dojo !== 'Unassigned' ? row.dojo.split(', ') : [];
+            
+            if (dojoList.length === 0) {
+                return <span className="text-gray-400 italic text-sm">Unassigned</span>;
+            }
+
+            return (
+                <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                    {dojoList.map((d, i) => (
+                        <span key={i} className="bg-gray-100 border border-gray-200 text-gray-700 text-xs px-2 py-1 rounded-md whitespace-nowrap font-medium">
+                            {d}
+                        </span>
+                    ))}
+                </div>
+            )
+        } 
+    },
+    { 
+        label: 'DOJO COUNT', 
         key: 'dojos', 
         sortable: true, 
         render: (row) => (
@@ -109,7 +171,6 @@ export function InstructorView() {
             </span>
         ) 
     },
-    // --- NEW: Live Student Count Column ---
     { 
         label: 'STUDENTS', 
         key: 'students', 
@@ -174,20 +235,43 @@ export function InstructorView() {
         </button>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((s, i) => (
           <StatCard key={i} {...s} />
         ))}
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-           <h2 className="text-lg font-semibold text-gray-800">All Instructors</h2>
-           <p className="text-sm text-gray-500 mt-1">Click on any row to view full profile.</p>
+      {/* --- Filters & Search Row --- */}
+      <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm w-full">
+        
+        {/* Search Input */}
+        <div className="relative w-full md:w-72">
+           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+           <input 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name or phone..." 
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-600 outline-none text-sm text-gray-700 bg-gray-50 hover:bg-white transition-colors"
+           />
         </div>
         
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto md:ml-auto">
+            <FilterComponent
+                label="Dojo"
+                data={dojosList}
+                displayKey="name"
+                valueKey="name"
+                onFilterChange={setSelectedDojo}
+            />
+            <FilterComponent
+                label="Rank"
+                data={RANKS}
+                onFilterChange={setSelectedRank}
+            />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="animate-spin text-red-600 w-10 h-10" />
@@ -196,7 +280,7 @@ export function InstructorView() {
         ) : (
           <Table 
             columns={columns} 
-            data={instructors} 
+            data={filteredInstructors} 
             itemsPerPage={10}
             onRowClick={(instructor) => setSelectedInstructor(instructor)}
           />
@@ -228,11 +312,25 @@ export function InstructorView() {
                 
                 <h2 className="text-2xl font-bold text-center mb-1 text-gray-900">{selectedInstructor.name}</h2>
                 
-                <div className="flex justify-center mb-6 mt-2">
-                    <BeltBadge rank={selectedInstructor.rank} />
+                {/* --- UPDATED: Multiple Dojo Badges in Modal --- */}
+                <div className="flex flex-wrap justify-center gap-1.5 mb-2 mt-2">
+                    {selectedInstructor.dojo && selectedInstructor.dojo !== 'Unassigned' ? (
+                        selectedInstructor.dojo.split(', ').map((d, i) => (
+                            <span key={i} className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">
+                                <Building2 size={12} className="inline mr-1" />{d}
+                            </span>
+                        ))
+                    ) : (
+                        <span className="text-xs font-medium text-gray-400 italic">Unassigned Dojo</span>
+                    )}
+                </div>
+                
+                <div className="flex justify-center mb-6 mt-3">
+                    <span className={`px-4 py-1.5 rounded-md text-sm font-bold uppercase tracking-wide inline-block ${getRankStyle(selectedInstructor.rank)}`}>
+                        {selectedInstructor.rank}
+                    </span>
                 </div>
 
-                {/* --- LIVE COUNTS SECTION IN MODAL --- */}
                 <div className="flex justify-around items-center bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
                     <div className="text-center">
                         <span className="text-xs text-gray-500 uppercase font-bold tracking-wider block mb-1">Students</span>
@@ -242,14 +340,13 @@ export function InstructorView() {
                     </div>
                     <div className="w-px h-10 bg-gray-200"></div>
                     <div className="text-center">
-                        <span className="text-xs text-gray-500 uppercase font-bold tracking-wider block mb-1">Dojos</span>
+                        <span className="text-xs text-gray-500 uppercase font-bold tracking-wider block mb-1">Dojo Count</span>
                         <span className="text-xl font-bold text-purple-600 flex items-center justify-center gap-1.5">
                             <Building2 size={18} /> {selectedInstructor.dojos}
                         </span>
                     </div>
                 </div>
 
-                {/* Personal Info */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-lg">
                     <Calendar size={18} className="text-red-500 shrink-0"/>
@@ -265,13 +362,6 @@ export function InstructorView() {
                     <Mail size={18} className="text-red-500 shrink-0"/>
                     <span className="text-sm font-medium flex-1">Email:</span>
                     <span className="text-sm font-bold truncate">{selectedInstructor.email}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-gray-700 bg-gray-50 p-3 rounded-lg">
-                    <Shield size={18} className="text-red-500 shrink-0"/>
-                    <span className="text-sm font-medium flex-1">Status:</span>
-                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${selectedInstructor.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-800'}`}>
-                      {selectedInstructor.status}
-                    </span>
                   </div>
                 </div>
 
