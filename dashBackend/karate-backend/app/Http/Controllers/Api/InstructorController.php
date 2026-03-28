@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Instructor;
 use App\Models\Dojo;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class InstructorController extends Controller
 {
@@ -19,7 +20,6 @@ class InstructorController extends Controller
         $mappedInstructors = $instructors->map(function($instructor) {
             
             // Pluck the names of all assigned dojos and join them with a comma
-            // If the instructor has no dojos, it returns an empty string
             $dojoNames = $instructor->dojos->pluck('name')->join(', ');
 
             return [
@@ -49,23 +49,39 @@ class InstructorController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'     => 'required|string|max:255',
-            'rank'     => 'required|string|max:255',
-            'age'      => 'required|integer|min:18',
-            'email'    => 'required|email|unique:instructors,email',
-            'phone'    => 'required|string|max:20',
-            'status'   => 'required|string',
-            'image'    => 'required|url',
-            'dob'      => 'required|date',
-            'dojo_ids' => 'array|nullable' // Accept the array from React
+            'name'       => 'required|string|max:255',
+            'rank'       => 'required|string|max:255',
+            'age'        => 'required|integer|min:18',
+            'email'      => 'required|email|unique:instructors,email',
+            'phone'      => 'required|string|max:20',
+            'status'     => 'required|string',
+            'dob'        => 'required|date',
+            'dojo_ids'   => 'array|nullable',
+            // Image fields are now nullable because they can send either one
+            'image'      => 'nullable|url',
+            'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:5048', // Max 5MB file
         ]);
+
+        $imagePath = null;
+
+        // Check if a physical file was uploaded
+        if ($request->hasFile('image_file')) {
+            $path = $request->file('image_file')->store('instructors', 'public');
+            $imagePath = asset('storage/' . $path);
+        } 
+        // Or if they just pasted a URL
+        elseif ($request->filled('image')) {
+            $imagePath = $request->image;
+        }
+
+        // Add the correct image path back into the data array before saving
+        $validated['image'] = $imagePath;
 
         $instructor = Instructor::create($validated);
 
-        // Assign the Dojos to this new instructor
-        if ($request->has('dojo_ids') && !empty($request->dojo_ids)) {
-            Dojo::whereIn('id', $request->dojo_ids)
-                ->update(['instructor_id' => $instructor->id]);
+        // Assign the Dojos to this new instructor using Many-to-Many sync
+        if ($request->has('dojo_ids')) {
+            $instructor->dojos()->sync($request->dojo_ids);
         }
 
         return response()->json($instructor, 201);
@@ -91,29 +107,37 @@ class InstructorController extends Controller
         }
 
         $validated = $request->validate([
-            'name'     => 'required|string|max:255',
-            'rank'     => 'required|string|max:255',
-            'age'      => 'required|integer',
-            'email'    => 'required|email|unique:instructors,email,' . $id,
-            'phone'    => 'required|string',
-            'status'   => 'required|string',
-            'image'    => 'required|url',
-            'dob'      => 'required|date',
-            'dojo_ids' => 'array|nullable' // Accept the array from React
+            'name'       => 'required|string|max:255',
+            'rank'       => 'required|string|max:255',
+            'age'        => 'required|integer',
+            'email'      => 'required|email|unique:instructors,email,' . $id,
+            'phone'      => 'required|string',
+            'status'     => 'required|string',
+            'dob'        => 'required|date',
+            'dojo_ids'   => 'array|nullable',
+            'image'      => 'nullable|url',
+            'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:5048',
         ]);
+
+        $imagePath = $instructor->image; // Keep current image by default
+
+        // Check if a new file was uploaded
+        if ($request->hasFile('image_file')) {
+            $path = $request->file('image_file')->store('instructors', 'public');
+            $imagePath = asset('storage/' . $path);
+        } 
+        // Or if they pasted a new URL
+        elseif ($request->filled('image')) {
+            $imagePath = $request->image;
+        }
+
+        $validated['image'] = $imagePath;
 
         $instructor->update($validated);
 
-        // Sync Dojos: First remove all current links, then add the new ones
+        // Sync Dojos: Laravel automatically adds new ones and removes unselected ones seamlessly
         if ($request->has('dojo_ids')) {
-            // 1. Unassign all Dojos currently assigned to this instructor
-            Dojo::where('instructor_id', $instructor->id)->update(['instructor_id' => null]);
-            
-            // 2. Assign the newly selected Dojos
-            if (!empty($request->dojo_ids)) {
-                Dojo::whereIn('id', $request->dojo_ids)
-                    ->update(['instructor_id' => $instructor->id]);
-            }
+            $instructor->dojos()->sync($request->dojo_ids);
         }
 
         return response()->json($instructor, 200);
@@ -127,8 +151,8 @@ class InstructorController extends Controller
             return response()->json(['message' => 'Instructor not found'], 404);
         }
         
-        // Remove the instructor's ID from any linked Dojos before deleting
-        Dojo::where('instructor_id', $instructor->id)->update(['instructor_id' => null]);
+        // Safely detach all dojos from the pivot table before deleting
+        $instructor->dojos()->detach();
         
         $instructor->delete();
         return response()->json(['message' => 'Instructor deleted'], 200);

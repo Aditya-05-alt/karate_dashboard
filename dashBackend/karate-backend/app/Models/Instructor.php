@@ -21,7 +21,7 @@ class Instructor extends Model
     ];
     public function dojos()
     {
-        return $this->hasMany(Dojo::class);
+        return $this->belongsToMany(Dojo::class);
     }
 
     // An Instructor has many Students
