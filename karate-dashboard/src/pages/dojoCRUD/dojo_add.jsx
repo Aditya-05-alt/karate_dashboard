@@ -219,7 +219,7 @@ export function AddDojo() {
                                     <User className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <select 
-                                    required
+                                    // required
                                     name="instructor_id" 
                                     value={formData.instructor_id}
                                     onChange={handleChange}

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 1. Create the Axios Instance
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api', // Your Laravel URL
+  baseURL: 'https://karate-backend.shilmistannabhandar.com/public/api', // Your Laravel URL
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -126,14 +126,25 @@ export const getInstructor = async (id) => {
   return response.data;
 };
 
-export const createInstructor = async (data) => {
-  const response = await api.post('/instructors', data);
-  return response.data;
+export const createInstructor = async (formData) => {
+    // 1. Change 'axios.post' to 'api.post'
+    // 2. Change '/api/instructors' to '/instructors' (since api instance already includes '/api')
+    const response = await api.post('/instructors', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data', 
+        },
+    });
+    return response.data;
 };
 
-export const updateInstructor = async (id, data) => {
-  const response = await api.put(`/instructors/${id}`, data);
-  return response.data;
+export const updateInstructor = async (id, formData) => {
+    // Same changes here: use 'api.post' and remove the extra '/api'
+    const response = await api.post(`/instructors/${id}`, formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data', 
+        },
+    });
+    return response.data;
 };
 
 export const deleteInstructor = async (id) => {
